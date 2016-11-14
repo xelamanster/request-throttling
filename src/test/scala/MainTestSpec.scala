@@ -1,7 +1,8 @@
+import org.scalatest.OneInstancePerTest
 import throttle.ThrottleService._
 import throttle._
 
-class MainTestSpec extends TestSpec {
+class MainTestSpec extends TestSpec with OneInstancePerTest {
   val testUser1 = "user1"
   val testUser2 = "user2"
 
@@ -13,26 +14,24 @@ class MainTestSpec extends TestSpec {
     val time = new TestTimeProvider
     val metric = ThrottleMetric(rps, step, time)
 
-    val initialCount = (1 to rps + 1)
-      .map(i => metric.isAvailable)
+    val ratePerStep = rps * (step.toDouble / second)
+
+    def check(): Int = (1 to rps)
+      .map(i => metric.acquire)
       .count(b => b)
 
-    initialCount shouldBe rps
-
-    println("INCREASE")
+    val initialCount = check()
     time.increase(step)
+    val additionalCount = check()
 
-    val additionalCount = (1 to rps)
-      .map(i => metric.isAvailable)
-      .count(b => b)
-
-    additionalCount shouldBe rps * (step.toDouble / second)
+    initialCount shouldBe ratePerStep
+    additionalCount shouldBe ratePerStep
   }
 
   "When no token" should "assume the client as unauthorized" in {
     val slaStub = createSlaStub(1)
     val store = stub[MetricStore[String]]
-    val throttle = new ThrottleServiceImpl(slaStub, store)
+    val throttle = new ThrottleServiceImpl(1, slaStub, store)
 
     throttle.isRequestAllowed(None)
     throttle.isRequestAllowed(None)
@@ -43,7 +42,7 @@ class MainTestSpec extends TestSpec {
   "When no loaded SLA for user" should "assume the client as unauthorized" in {
     val slaStub = createSlaStub(1, testUser1)
     val store = stub[MetricStore[String]]
-    val throttle = new ThrottleServiceImpl(slaStub, store)
+    val throttle = new ThrottleServiceImpl(1, slaStub, store)
 
     throttle.isRequestAllowed(Option(testUser1))
 
@@ -51,10 +50,11 @@ class MainTestSpec extends TestSpec {
   }
 
   "When rps elapsed" should "return false " in {
-    val slaStub = createSlaStub(1, testUser1)
-    val throttle = new ThrottleServiceImpl(1, slaStub)
+    val slaStub = createSlaStub(10, testUser1)
+    val throttle = new ThrottleServiceImpl(10, slaStub)
 
     throttle.isRequestAllowed(Option(testUser1)) shouldBe true // unauthorized or user request. May differ because of race conditions
+    throttle.isRequestAllowed(Option(testUser1)) // user request
     throttle.isRequestAllowed(Option(testUser1)) // user request
     throttle.isRequestAllowed(Option(testUser1)) shouldBe false // user request
   }

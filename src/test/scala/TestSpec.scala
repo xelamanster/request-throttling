@@ -6,15 +6,15 @@ import scala.concurrent.Future
 
 class TestSpec extends FlatSpec with Matchers with MockFactory {
   def createSlaStub(rps: Int, users: String*): SlaService = {
-    val serviceMock = stub[SlaService]
+    val slaService = stub[SlaService]
     for(user <- users)
-      (serviceMock.getSlaByToken _)
+      (slaService.getSlaByToken _)
         .when(user)
         .returning(
           Future.successful(Sla(user, rps))
         )
 
-    serviceMock
+    slaService
   }
 }
 
