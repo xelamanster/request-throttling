@@ -1,39 +1,88 @@
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FlatSpec, Matchers}
-import throttle.{Sla, SlaService, ThrottleServiceImpl, TimeProvider}
+import throttle.ThrottleService._
+import throttle._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class MyTestSpec extends FlatSpec with Matchers with MockFactory {
-  val myTimeProvider = new TimeProvider {
-    override def millis: Long = 0
+class TestTimeProvider extends TimeProvider {
+  var time: Long = 0
+
+  override def millis: Long = time
+
+  def increase(time: Long): Unit =
+    this.time = time
+}
+
+class TestSpec extends FlatSpec with Matchers with MockFactory {
+  val testUser1 = "user1"
+  val testUser2 = "user2"
+
+  "When check availability" should "update rps" in {
+    val second = 1000
+    val step = 100
+
+    val initialValue = 10
+    val time = new TestTimeProvider
+    val metric = ThrottleMetric(initialValue, step, time)
+
+    val initialCount = (1 to initialValue + 1)
+      .map(i => metric.isAvailable)
+      .count(b => b)
+
+    initialCount shouldBe initialValue
+
+    time.increase(step)
+
+    val additionalCount = (1 to initialValue)
+      .map(i => metric.isAvailable)
+      .count(b => b)
+
+    additionalCount shouldBe initialValue * (step / second)
   }
 
-  "ThrottleService" should "return false if" in {
-    val user1 = "user1"
+  "When no token" should "assume the client as unauthorized" in {
+    val slaStub = createSlaStub(1)
+    val store = stub[MetricStore[String]]
+    val throttle = new ThrottleServiceImpl(1, slaStub, store)
 
-    val slaStub = createSlaStub(1, user1)
-    val throttle = new ThrottleServiceImpl(1, slaStub)
+    throttle.isRequestAllowed(None)
+    throttle.isRequestAllowed(None)
 
-    throttle.isRequestAllowed(Option(user1)) shouldBe true
-    throttle.isRequestAllowed(Option(user1)) shouldBe false
+    (store.acquire _).verify(UnauthorizedUserToken).twice()
   }
 
-  "ThrottleService" should "call SlaService once for each user" in {
-    val user1 = "user1"
-    val user2 = "user2"
+  "When no loaded SLA for user" should "assume the client as unauthorized" in {
+    val slaStub = createSlaStub(1, testUser1)
+    val store = stub[MetricStore[String]]
+    val throttle = new ThrottleServiceImpl(1, slaStub, store)
 
-    val slaStub = createSlaStub(1, user1, user2)
+    throttle.isRequestAllowed(Option(testUser1))
+
+    (store.acquire _).verify(UnauthorizedUserToken).once()
+  }
+
+  "When rps elapsed" should "return false " in {
+    val slaStub = createSlaStub(1, testUser1)
     val throttle = new ThrottleServiceImpl(1, slaStub)
 
-    throttle.isRequestAllowed(Option(user1))
-    throttle.isRequestAllowed(Option(user2))
-    throttle.isRequestAllowed(Option(user1))
-    throttle.isRequestAllowed(Option(user2))
+    throttle.isRequestAllowed(Option(testUser1)) shouldBe true // unauthorized request
+    throttle.isRequestAllowed(Option(testUser1)) shouldBe true // user request
+    throttle.isRequestAllowed(Option(testUser1)) shouldBe false // user request
+  }
 
-    (slaStub.getSlaByToken _).verify(user1).once()
-    (slaStub.getSlaByToken _).verify(user2).once()
+  "When multiply requests by one user" should "call SlaService once" in {
+    val slaStub = createSlaStub(1, testUser1, testUser2)
+    val throttle = new ThrottleServiceImpl(1, slaStub)
+
+    throttle.isRequestAllowed(Option(testUser1))
+    throttle.isRequestAllowed(Option(testUser2))
+    throttle.isRequestAllowed(Option(testUser1))
+    throttle.isRequestAllowed(Option(testUser2))
+
+    (slaStub.getSlaByToken _).verify(testUser1).once()
+    (slaStub.getSlaByToken _).verify(testUser2).once()
   }
 
   def createSlaStub(rps: Int, users: String*): SlaService = {

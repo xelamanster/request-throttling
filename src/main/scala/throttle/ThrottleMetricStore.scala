@@ -2,20 +2,26 @@ package throttle
 
 import scala.collection.mutable
 
-class ThrottleMetricStore[T](step: Long) {
+trait MetricStore[T] {
+  def contains(key: T): Boolean
+  def acquire(key: T): Boolean
+  def put(key: T, rps: Int): Unit
+}
+
+class ThrottleMetricStore[T](step: Long) extends MetricStore[T] {
   val store = mutable.Map[T, ThrottleMetric]()
 
-  def contains(key: T): Boolean =
+  override def contains(key: T): Boolean =
     store.contains(key)
 
-  def acquire(key: T): Boolean =
+  override def acquire(key: T): Boolean =
     store(key).isAvailable
 
-  def put(key: T, rps: Int): Unit =
+  override def put(key: T, rps: Int): Unit =
     store += key -> ThrottleMetric(rps, step)
 }
 
-case class ThrottleMetric(rps: Int, step: Long, time: TimeProvider = SystemTime) {
+case class ThrottleMetric(rps: Int, step: Long, time: TimeProvider = SystemTimeProvider) {
   private var lastCheckAt = time.millis
   private var availability: Double = rps
 

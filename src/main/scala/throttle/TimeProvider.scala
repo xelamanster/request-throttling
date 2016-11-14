@@ -4,6 +4,6 @@ trait TimeProvider {
   def millis: Long
 }
 
-object SystemTime extends TimeProvider {
+object SystemTimeProvider extends TimeProvider {
   override def millis: Long = System.currentTimeMillis()
 }
