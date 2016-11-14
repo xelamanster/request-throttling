@@ -1,3 +1,3 @@
 # request-throttling
 
-## Implementation of the throttling service.
+Implementation of the throttling service.
