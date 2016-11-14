@@ -1,7 +1,6 @@
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FlatSpec, Matchers}
 import throttle.{Sla, SlaService, TimeProvider}
-import scala.concurrent.ExecutionContext.Implicits.global
 
 import scala.concurrent.Future
 
@@ -14,7 +13,7 @@ class TestSpec extends FlatSpec with Matchers with MockFactory {
       (serviceMock.getSlaByToken _)
         .when(user)
         .returning(
-          Future(Sla(user, rps))
+          Future.successful(Sla(user, rps))
         )
 
     serviceMock

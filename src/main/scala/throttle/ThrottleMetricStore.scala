@@ -8,17 +8,21 @@ trait MetricStore[T] {
   def put(key: T, rps: Int): Unit
 }
 
-class ThrottleMetricStore[T](step: Long) extends MetricStore[T] {
+class ThrottleMetricStore[T](step: Long, defaultKey: T, defaultRps: Int) extends MetricStore[T] {
   val store = mutable.Map[T, ThrottleMetric]()
+  put(defaultKey, defaultRps)
 
   override def contains(key: T): Boolean =
     store.contains(key)
 
-  override def acquire(key: T): Boolean =
-    store(key).isAvailable
+  override def acquire(key: T): Boolean = store.get(key) match {
+    case Some(metric) => metric.isAvailable
+    case None => acquire(defaultKey)
+  }
 
-  override def put(key: T, rps: Int): Unit =
+  override def put(key: T, rps: Int): Unit = {
     store += key -> ThrottleMetric(rps, step)
+  }
 }
 
 case class ThrottleMetric(rps: Int, step: Long, time: TimeProvider = SystemTimeProvider) {

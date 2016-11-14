@@ -7,31 +7,29 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success, Try}
 
 class ThrottleServiceImpl(
-    override protected val graceRps: Int,
     override protected val slaService: SlaService,
     store: MetricStore[String])
   extends ThrottleService {
 
   def this(graceRps: Int, slaService: SlaService) {
-    this(graceRps, slaService, new ThrottleMetricStore(DefaultStep))
+    this(slaService, new ThrottleMetricStore(DefaultStep, UnauthorizedUserToken, graceRps))
   }
 
   private val slaRequests = mutable.ArrayBuffer[String]()
-
-  store.put(UnauthorizedUserToken, graceRps)
 
   override def isRequestAllowed(token: Option[String]): Boolean = token match {
     case Some(user) => isRequestAllowed(user)
     case None => store.acquire(UnauthorizedUserToken)
   }
 
-  private def isRequestAllowed(user: String): Boolean =
+  private def isRequestAllowed(user: String): Boolean = {
     if(store.contains(user))
       store.acquire(user)
     else {
       sendSlaRequest(user)
       store.acquire(UnauthorizedUserToken)
     }
+  }
 
   private def sendSlaRequest(user: String): Unit =
     if (!slaRequests.contains(user)) {
@@ -40,7 +38,9 @@ class ThrottleServiceImpl(
     }
 
   private def processSla(result: Try[Sla], user: String): Unit = {
-    slaRequests -= user
+    slaRequests.synchronized {
+      slaRequests -= user
+    }
     result match {
       case Success(sla) =>
         store.synchronized {
