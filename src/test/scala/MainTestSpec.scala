@@ -30,7 +30,7 @@ class MainTestSpec extends TestSpec with OneInstancePerTest {
 
   "When no token" should "assume the client as unauthorized" in {
     val slaStub = createSlaStub(1)
-    val store = stub[MetricStore[String]]
+    val store = stub[MetricStore[User]]
     val throttle = new ThrottleServiceImpl(1, slaStub, store)
 
     throttle.isRequestAllowed(None)
@@ -41,7 +41,7 @@ class MainTestSpec extends TestSpec with OneInstancePerTest {
 
   "When no loaded SLA for user" should "assume the client as unauthorized" in {
     val slaStub = createSlaStub(1, testUser1)
-    val store = stub[MetricStore[String]]
+    val store = stub[MetricStore[User]]
     val throttle = new ThrottleServiceImpl(1, slaStub, store)
 
     throttle.isRequestAllowed(Option(testUser1))

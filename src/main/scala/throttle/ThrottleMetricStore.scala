@@ -8,6 +8,9 @@ trait MetricStore[T] {
   def put(key: T, rps: Int): Unit
 }
 
+/**
+  * Holds throttle metrics.
+  */
 class ThrottleMetricStore[T](step: Long) extends MetricStore[T] {
   val store = mutable.Map[T, ThrottleMetric]()
 
@@ -24,20 +27,33 @@ class ThrottleMetricStore[T](step: Long) extends MetricStore[T] {
   }
 }
 
+/**
+  * Holds and updates throttle metrics for one user.
+  * Control max available requests per update step value.
+  *
+  * @param rps maximum requests per second
+  * @param step update step
+  * @param time time providing utility
+  */
 case class ThrottleMetric(rps: Int, step: Long, time: TimeProvider = SystemTimeProvider) {
   private val stepDelta = step / 1000.0
   private val ratePerStep = rps * stepDelta
   private val maxAmount = 1
 
   private var lastCheckAt = time.millis
-  private var availability: Double = ratePerStep
+  private var availability: Double = maxAmount
 
+  /**
+    * Updates metrics and return is there available request at current time.
+    *
+    * @return is request available
+    */
   def acquire: Boolean = {
     update()
     decrease()
   }
 
-  def decrease(): Boolean = {
+  private def decrease(): Boolean = {
     if (availability >= 1) {availability -= 1; true}
     else false
   }

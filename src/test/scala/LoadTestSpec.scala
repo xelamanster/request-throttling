@@ -1,43 +1,36 @@
-import java.time.Duration
-import java.util.concurrent.{Executors, TimeUnit}
-
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
-import org.scalatest.junit.JUnitRunner
-import org.scalatest.time.{Millis, Seconds, Span}
 import throttle.ThrottleServiceImpl
 
 import scala.collection.mutable
 import scala.util.Random
 
-class LoadTestSpec extends TestSpec with Eventually with IntegrationPatience {
-  val usersCount = 3
-  val rps = 10
-  val duration = 5
+class LoadTestSpec extends TestSpec {
 
-//  s"For $usersCount users, $rps rps during $duration seconds" should
-//    s"retturn arroud ${usersCount * rps * duration} successful requests" in {
-
-  "For  seconds" should
-    "retturn successful requests" in {
+  it should "permit proper amount of requests" in {
+    val usersCount = 3
+    val rps = 10
+    val duration = 5
 
     val users = (0 until usersCount).map("user" + _)
     val tokens = users.map(Option(_))
-    val fg = usersCount * rps * duration
+    val expectedRequestsAmount = usersCount * rps * duration
+    val delta = math.round(expectedRequestsAmount * 0.05f)
 
     val slaStub = createSlaStub(rps, users:_*)
     val throttle = new ThrottleServiceImpl(rps, slaStub)
 
-    val results = mutable.ListBuffer[Boolean]()
+    val result = mutable.ListBuffer[Boolean]()
 
     val start = System.currentTimeMillis()
-    while(System.currentTimeMillis() - start < duration * 1000 ) {
-      (0 until rps).foreach{
-        i => tokens.foreach{
-                    t => results += throttle.isRequestAllowed(t)}}
-      Thread.sleep(Math.min(100, System.currentTimeMillis() - start))
+    def timePassed = System.currentTimeMillis() - start
+
+    while(timePassed < duration * 1000 ) {
+      for (x <- 0 until rps; t <- tokens)
+        result += throttle.isRequestAllowed(t)
+
+      Thread.sleep(Math.min(100, timePassed))
     }
 
-    println(results.count(b => b) + " " + fg)
+    result.count(b => b) shouldBe expectedRequestsAmount +- delta
   }
 
   "Throttle overhead" should "be measured " in {
@@ -51,7 +44,7 @@ class LoadTestSpec extends TestSpec with Eventually with IntegrationPatience {
     val users = (0 until usersCount).map("user" + _)
     val tokens = users.map(Option(_))
 
-    val resultList = mutable.ListBuffer[Boolean]()
+    val result = mutable.ListBuffer[Boolean]()
     val slaStub = createSlaStub(1000, users:_*)
     val throttle = new ThrottleServiceImpl(100000, slaStub)
 
@@ -59,7 +52,7 @@ class LoadTestSpec extends TestSpec with Eventually with IntegrationPatience {
 
     def runFor(count: Int): Unit =
       for(x <- 0 until count)
-        resultList += throttle.isRequestAllowed(randomToken())
+        result += throttle.isRequestAllowed(randomToken())
 
     //warmUp
     runFor(warmUpRuns)
@@ -70,7 +63,7 @@ class LoadTestSpec extends TestSpec with Eventually with IntegrationPatience {
     val timePassed = System.nanoTime() - startTime
     val timePerRun = timePassed / normalRuns / toMillsDivider
 
-    resultList.size shouldBe warmUpRuns + normalRuns
-    println("Throttle overhead: " + timePerRun)
+    result.size shouldBe warmUpRuns + normalRuns
+    println(s"Throttle overhead: $timePerRun millis")
   }
 }
