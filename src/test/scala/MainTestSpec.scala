@@ -6,24 +6,27 @@ class MainTestSpec extends TestSpec {
   val testUser2 = "user2"
 
   "When check availability" should "update rps" in {
+    val rps = 10
     val step = 100
-    val initialValue = 10
-    val time = new TestTimeProvider
-    val metric = ThrottleMetric(initialValue, step, time)
+    val second = 1000
 
-    val initialCount = (1 to initialValue + 1)
+    val time = new TestTimeProvider
+    val metric = ThrottleMetric(rps, step, time)
+
+    val initialCount = (1 to rps + 1)
       .map(i => metric.isAvailable)
       .count(b => b)
 
-    initialCount shouldBe initialValue
+    initialCount shouldBe rps
 
+    println("INCREASE")
     time.increase(step)
 
-    val additionalCount = (1 to initialValue)
+    val additionalCount = (1 to rps)
       .map(i => metric.isAvailable)
       .count(b => b)
 
-    additionalCount shouldBe initialValue * (step / second)
+    additionalCount shouldBe rps * (step.toDouble / second)
   }
 
   "When no token" should "assume the client as unauthorized" in {

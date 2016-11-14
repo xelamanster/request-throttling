@@ -37,15 +37,19 @@ case class ThrottleMetric(rps: Int, step: Long, time: TimeProvider = SystemTimeP
   private def update(): Unit = {
     val current = time.millis
     val passed = current - lastCheckAt
-    val stepsPassed = passed % step
-    val newAvailability = availability + (stepsPassed * step) / 1000.0 * rps
+    val stepsPassed = passed / step
+    val increse: Double = (stepsPassed * step) / 1000.0 * rps
+    val newAvailability = availability + increse
 
     lastCheckAt = current
     availability = scala.math.min(newAvailability, rps)
+
+    println("" + availability + " " + newAvailability + " " + passed + " " + stepsPassed + " " + increse)
   }
 
   private def acquire: Boolean = {
     availability -= 1
+    println("ACUIRE " + availability)
     true
   }
 }

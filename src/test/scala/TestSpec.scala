@@ -5,8 +5,6 @@ import throttle.{Sla, SlaService, TimeProvider}
 import scala.concurrent.Future
 
 class TestSpec extends FlatSpec with Matchers with MockFactory {
-  val second = 1000
-
   def createSlaStub(rps: Int, users: String*): SlaService = {
     val serviceMock = stub[SlaService]
     for(user <- users)
