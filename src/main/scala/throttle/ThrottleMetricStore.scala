@@ -1,17 +1,8 @@
 package throttle
 
-import throttle.ThrottleMetricStore._
 import scala.collection.mutable
 
-object ThrottleMetricStore {
-  val DefaultStep = 100
-
-  implicit val timeProvider = new TimeProvider {
-    override def millis: Long = System.currentTimeMillis()
-  }
-}
-
-class ThrottleMetricStore[T] {
+class ThrottleMetricStore[T](step: Long, time: TimeProvider) {
   val store = mutable.Map[T, ThrottleMetric]()
 
   def contains(key: T): Boolean =
@@ -21,10 +12,10 @@ class ThrottleMetricStore[T] {
     store(key).isAvailable
 
   def put(key: T, rps: Int): Unit =
-    store += key -> ThrottleMetric(rps, DefaultStep)
+    store += key -> ThrottleMetric(rps, step, time)
 }
 
-case class ThrottleMetric(rps: Int, step: Long)(implicit time: TimeProvider) {
+case class ThrottleMetric(rps: Int, step: Long, time: TimeProvider) {
   private var lastCheckAt = time.millis
   private var availability: Double = rps
 
@@ -47,8 +38,4 @@ case class ThrottleMetric(rps: Int, step: Long)(implicit time: TimeProvider) {
     availability -= 1
     true
   }
-}
-
-trait TimeProvider {
-  def millis: Long
 }
