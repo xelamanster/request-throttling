@@ -10,6 +10,16 @@ class MyTestSpec extends FlatSpec with Matchers with MockFactory {
     override def millis: Long = 0
   }
 
+  "ThrottleService" should "return false if" in {
+    val user1 = "user1"
+
+    val slaStub = createSlaStub(1, user1)
+    val throttle = new ThrottleServiceImpl(1, slaStub)
+
+    throttle.isRequestAllowed(Option(user1)) shouldBe true
+    throttle.isRequestAllowed(Option(user1)) shouldBe false
+  }
+
   "ThrottleService" should "call SlaService once for each user" in {
     val user1 = "user1"
     val user2 = "user2"

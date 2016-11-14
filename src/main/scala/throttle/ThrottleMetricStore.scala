@@ -2,7 +2,7 @@ package throttle
 
 import scala.collection.mutable
 
-class ThrottleMetricStore[T](step: Long, time: TimeProvider) {
+class ThrottleMetricStore[T](step: Long) {
   val store = mutable.Map[T, ThrottleMetric]()
 
   def contains(key: T): Boolean =
@@ -12,10 +12,10 @@ class ThrottleMetricStore[T](step: Long, time: TimeProvider) {
     store(key).isAvailable
 
   def put(key: T, rps: Int): Unit =
-    store += key -> ThrottleMetric(rps, step, time)
+    store += key -> ThrottleMetric(rps, step)
 }
 
-case class ThrottleMetric(rps: Int, step: Long, time: TimeProvider) {
+case class ThrottleMetric(rps: Int, step: Long, time: TimeProvider = SystemTime) {
   private var lastCheckAt = time.millis
   private var availability: Double = rps
 
